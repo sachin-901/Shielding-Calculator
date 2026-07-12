@@ -126,6 +126,45 @@
             background-color: #f1f3f5;
             color: var(--primary-color);
         }
+        .formula-section {
+            margin-top: 40px;
+            padding: 25px;
+            background-color: #f1f3f5;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-family: "Times New Roman", Times, serif;
+        }
+        .formula-title {
+            text-align: center;
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: var(--primary-color);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        .formula-math {
+            text-align: center;
+            font-size: 1.4em;
+            margin: 15px 0;
+            color: var(--primary-color);
+            background: white;
+            padding: 15px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        .formula-legend {
+            font-size: 0.95em;
+            line-height: 1.5;
+            color: #333;
+        }
+        .note-section {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 2px dashed #ccc;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-size: 0.9em;
+            color: #555;
+        }
     </style>
 </head>
 <body>
@@ -189,6 +228,7 @@
         <h3 style="margin-top:0; border-bottom: 1px solid #b3d7ff; padding-bottom: 5px;">Base Attenuation Profile</h3>
         <div class="result-item">Required Transmission Factor (B): <span id="resB" class="result-value">0.000</span></div>
         <div class="result-item">Total Required TVLs (n): <span id="resN" class="result-value">0.000</span></div>
+        <div class="result-item">Required Thickness <span style="font-size: 0.85em; font-weight: normal; color: #555;">(using Existing Material TVL)</span>: <span id="resReqThickBase" class="result-value">0.000 cm</span></div>
     </div>
 
     <div class="safety-section">
@@ -227,7 +267,6 @@
 
     <div class="table-section">
         <h3>Reference TVL Table (cm)</h3>
-        <p style="font-size: 0.9em; color: #666; margin-top: -10px;">Standard approximation values based on literature (NCRP 151 / NCRP 49).</p>
         
         <div style="background: #f8f9fa; padding: 10px; border-radius: 4px; border: 1px solid var(--border-color); display: flex; align-items: center; gap: 15px;">
             <label for="customDensity" style="margin-bottom: 0;"><strong>Custom Material Density [g/cm³]:</strong></label>
@@ -277,6 +316,36 @@
         </table>
     </div>
 
+    <div class="formula-section">
+        <div class="formula-title">Calculation Formula</div>
+        <div class="formula-math">
+            <i>B</i> = [ <i>P</i> &times; (<i>d<sub>total</sub></i>)<sup>2</sup> ] / [ <i>W</i> &times; 1000 &times; <i>U</i> &times; <i>T</i> ]
+        </div>
+        <div class="formula-legend">
+            <p style="margin-top: 0;"><strong>Where:</strong></p>
+            <ul style="margin-top: 5px; padding-left: 20px;">
+                <li><i>B</i> = Required transmission factor</li>
+                <li><i>P</i> = Permissible dose limit (mR/week)</li>
+                <li><i>W</i> = Workload (cGy/week)</li>
+                <li><i>1000</i> = Conversion factor (1 cGy &approx; 1000 mR)</li>
+                <li><i>U</i> = Use factor</li>
+                <li><i>T</i> = Occupancy factor</li>
+                <li><i>d<sub>total</sub></i> = Total distance to occupied area (meters)</li>
+            </ul>
+            <p><strong>Required Attenuation:</strong><br>
+            <i>n</i> = -log<sub>10</sub>(<i>B</i>) <br>
+            <i>Required Thickness</i> = <i>n</i> &times; TVL</p>
+        </div>
+
+        <div class="note-section">
+            <strong>Note:</strong>
+            <ul style="margin-top: 5px; padding-left: 20px; margin-bottom: 0;">
+                <li><strong>Outer Wall Placement:</strong> If extra shielding is added to the <em>outer</em> side of the bunker, the total distance (<i>d<sub>total</sub></i>) to the occupied area increases by the thickness of the newly added material. Because radiation follows the inverse square law, this increased distance slightly reduces the required attenuation. The calculator uses an iterative mathematical loop to perfectly balance this increased distance against the extra TVLs required.</li>
+                <li><strong>Density Scaling:</strong> The Custom TVL values in the reference table are generated using linear density scaling based on ordinary concrete (2.35 g/cm³). The formula is: <code>Custom_TVL = Concrete_TVL &times; (2.35 / Custom_Density)</code>. Note that actual TVL values can vary slightly due to material composition (e.g., high-Z vs low-Z materials causing spectral changes), so standard literature values should be confirmed for final clinical commissioning.</li>
+            </ul>
+        </div>
+    </div>
+
 </div>
 
 <script>
@@ -290,7 +359,11 @@
         const P_mR = parseFloat(document.getElementById('permissibleDose').value);
         const tvl_exist = parseFloat(document.getElementById('tvlExist').value);
         const tvl_extra = parseFloat(document.getElementById('tvlExtra').value);
-        const placement = document.querySelector('input[name="placement"]:checked').value;
+        let placement = 'inner';
+        const placementRadios = document.querySelectorAll('input[name="placement"]');
+        placementRadios.forEach(radio => {
+            if (radio.checked) placement = radio.value;
+        });
 
         if (isNaN(W_cGy) || isNaN(d_inner) || isNaN(t_wall) || isNaN(tvl_exist) || W_cGy <= 0) return;
 
@@ -302,13 +375,16 @@
         const B_initial = (P_mR * (d_base * d_base)) / (W_mR * U * T);
 
         let n_req_initial = 0;
+        let t_req_initial = 0;
         if (B_initial > 0 && B_initial < 1) {
             n_req_initial = -Math.log10(B_initial);
+            t_req_initial = n_req_initial * tvl_exist;
         }
 
         // Display Initial Requirements
         document.getElementById('resB').innerText = (B_initial > 0 && B_initial < 0.001) ? B_initial.toExponential(3) : B_initial.toFixed(3);
         document.getElementById('resN').innerText = n_req_initial.toFixed(3);
+        document.getElementById('resReqThickBase').innerText = t_req_initial.toFixed(3) + " cm";
 
         // Safety Assessment
         const t_exist_cm = t_wall * 100;
