@@ -226,7 +226,7 @@
 
     <div class="results">
         <h3 style="margin-top:0; border-bottom: 1px solid #b3d7ff; padding-bottom: 5px;">Base Attenuation Profile</h3>
-        <div class="result-item">Required Transmission Factor (B): <span id="resB" class="result-value">0.000</span></div>
+        <div class="result-item">Required Reduction Factor (R): <span id="resR" class="result-value">0.000</span></div>
         <div class="result-item">Total Required TVLs (n): <span id="resN" class="result-value">0.000</span></div>
         <div class="result-item">Required Thickness <span style="font-size: 0.85em; font-weight: normal; color: #555;">(using Existing Material TVL)</span>: <span id="resReqThickBase" class="result-value">0.000 cm</span></div>
     </div>
@@ -317,23 +317,23 @@
     </div>
 
     <div class="formula-section">
-        <div class="formula-title">Calculation Formula</div>
+        <div class="formula-title">Calculation Formula (Reduction Factor)</div>
         <div class="formula-math">
-            <i>B</i> = [ <i>P</i> &times; (<i>d<sub>total</sub></i>)<sup>2</sup> ] / [ <i>W</i> &times; 1000 &times; <i>U</i> &times; <i>T</i> ]
+            <i>R</i> = [ <i>W</i> &times; 1000 &times; <i>U</i> &times; <i>T</i> ] / [ <i>P</i> &times; (<i>d<sub>total</sub></i>)<sup>2</sup> ] 
         </div>
         <div class="formula-legend">
             <p style="margin-top: 0;"><strong>Where:</strong></p>
             <ul style="margin-top: 5px; padding-left: 20px;">
-                <li><i>B</i> = Required transmission factor</li>
-                <li><i>P</i> = Permissible dose limit (mR/week)</li>
+                <li><i>R</i> = Required reduction factor</li>
                 <li><i>W</i> = Workload (cGy/week)</li>
                 <li><i>1000</i> = Conversion factor (1 cGy &approx; 1000 mR)</li>
                 <li><i>U</i> = Use factor</li>
                 <li><i>T</i> = Occupancy factor</li>
+                <li><i>P</i> = Permissible dose limit (mR/week)</li>
                 <li><i>d<sub>total</sub></i> = Total distance to occupied area (meters)</li>
             </ul>
             <p><strong>Required Attenuation:</strong><br>
-            <i>n</i> = -log<sub>10</sub>(<i>B</i>) <br>
+            <i>n</i> = log<sub>10</sub>(<i>R</i>) <br>
             <i>Required Thickness</i> = <i>n</i> &times; TVL</p>
         </div>
 
@@ -372,17 +372,27 @@
         document.getElementById('displayTotalDist').innerText = d_base.toFixed(3);
 
         const W_mR = W_cGy * 1000;
-        const B_initial = (P_mR * (d_base * d_base)) / (W_mR * U * T);
+        
+        // Calculate R instead of B
+        const R_initial = (W_mR * U * T) / (P_mR * (d_base * d_base));
 
         let n_req_initial = 0;
         let t_req_initial = 0;
-        if (B_initial > 0 && B_initial < 1) {
-            n_req_initial = -Math.log10(B_initial);
+        
+        // If R > 1, shielding is required to reduce the beam
+        if (R_initial > 1) {
+            n_req_initial = Math.log10(R_initial);
             t_req_initial = n_req_initial * tvl_exist;
         }
 
         // Display Initial Requirements
-        document.getElementById('resB').innerText = (B_initial > 0 && B_initial < 0.001) ? B_initial.toExponential(3) : B_initial.toFixed(3);
+        // Format R: if it's very large, use scientific notation, otherwise fixed to 3 decimals
+        if (R_initial > 10000) {
+            document.getElementById('resR').innerText = R_initial.toExponential(3);
+        } else {
+            document.getElementById('resR').innerText = R_initial.toFixed(3);
+        }
+        
         document.getElementById('resN').innerText = n_req_initial.toFixed(3);
         document.getElementById('resReqThickBase').innerText = t_req_initial.toFixed(3) + " cm";
 
@@ -417,8 +427,8 @@
                 // Iterative calculation to adjust for slightly lower required shielding due to increased distance
                 for (let i = 0; i < 15; i++) {
                     final_d = d_base + (t_extra_cm / 100);
-                    let final_B = (P_mR * (final_d * final_d)) / (W_mR * U * T);
-                    final_n_req = (final_B > 0 && final_B < 1) ? -Math.log10(final_B) : 0;
+                    let final_R = (W_mR * U * T) / (P_mR * (final_d * final_d));
+                    final_n_req = (final_R > 1) ? Math.log10(final_R) : 0;
                     n_short = final_n_req - n_exist;
                     
                     if (n_short < 0) n_short = 0; // Edge case catch
