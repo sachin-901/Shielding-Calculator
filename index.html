@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Radiotherapy Bunker Shielding Calculator</title>
+    <title>Primary Barrier Shielding Calculator</title>
     <style>
         :root {
             --primary-color: #2c3e50;
@@ -38,11 +38,21 @@
         .form-group {
             margin-bottom: 15px;
         }
+        .form-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .form-row .form-group {
+            flex: 1;
+            margin-bottom: 0;
+        }
         label {
             display: block;
             font-weight: 600;
             margin-bottom: 5px;
             color: var(--secondary-color);
+            font-size: 0.95em;
         }
         input[type="number"], select {
             width: 100%;
@@ -72,22 +82,52 @@
             font-weight: bold;
             color: var(--accent-color);
         }
+        .formula-section {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+            text-align: center;
+            font-family: "Times New Roman", Times, serif;
+            font-size: 1.1em;
+            background-color: #fcfcfc;
+            border-radius: 4px;
+            padding: 15px;
+        }
+        .formula-math {
+            font-size: 1.3em;
+            margin: 10px 0;
+            color: var(--primary-color);
+        }
+        .formula-legend {
+            font-size: 0.85em;
+            color: #666;
+            text-align: left;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
 
 <div class="calculator-container">
     <h2>Primary Barrier Shielding Calculator</h2>
-    <p>Based on NCRP Report 151 methodology.</p>
-
+    
     <div class="form-group">
-        <label for="workload">Workload (W) [Gy/week]:</label>
-        <input type="number" id="workload" value="500" min="10" step="10" oninput="calculate()">
+        <label for="workload">Workload (W) [cGy/week]:</label>
+        <input type="number" id="workload" value="50000" min="0" step="1000" oninput="calculate()">
     </div>
 
-    <div class="form-group">
-        <label for="distance">Distance to occupied area (d) [meters]:</label>
-        <input type="number" id="distance" value="4.0" min="0.1" step="0.1" oninput="calculate()">
+    <div class="form-row">
+        <div class="form-group">
+            <label for="innerDist">Inner Dimension [m]:</label>
+            <input type="number" id="innerDist" value="3.0" min="0.1" step="0.1" oninput="calculate()">
+        </div>
+        <div class="form-group">
+            <label for="wallThick">Wall Thickness [m]:</label>
+            <input type="number" id="wallThick" value="1.0" min="0.1" step="0.1" oninput="calculate()">
+        </div>
+    </div>
+    <div style="font-size: 0.85em; color: #666; margin-top: -10px; margin-bottom: 15px;">
+        Total Distance (d) = <span id="displayTotalDist">4.0</span> m
     </div>
 
     <div class="form-group">
@@ -109,22 +149,19 @@
     </div>
 
     <div class="form-group">
-        <label for="permissibleDose">Permissible Dose (P) [mSv/week]:</label>
+        <label for="permissibleDose">Permissible Dose (P) [mR/week]:</label>
         <select id="permissibleDose" onchange="calculate()">
-            <option value="0.1" selected>0.1 (Controlled Area / Occupational)</option>
-            <option value="0.02">0.02 (Uncontrolled Area / Public)</option>
+            <option value="10" selected>10 (Controlled Area / Occupational)</option>
+            <option value="2">2 (Uncontrolled Area / Public)</option>
         </select>
     </div>
 
     <div class="form-group">
-        <label for="tvlMaterial">Shielding Material & Energy (TVL):</label>
-        <select id="tvlMaterial" onchange="calculate()">
-            <option value="37">Concrete @ 6 MV (TVL = 37 cm)</option>
-            <option value="41">Concrete @ 10 MV (TVL = 41 cm)</option>
-            <option value="44">Concrete @ 15 MV (TVL = 44 cm)</option>
-            <option value="5.7">Lead @ 6 MV (TVL = 5.7 cm)</option>
-            <option value="11">Steel @ 6 MV (TVL = 11.0 cm)</option>
-        </select>
+        <label for="tvlInput">Custom Tenth-Value Layer (TVL) [cm]:</label>
+        <input type="number" id="tvlInput" value="37" min="1" step="0.1" oninput="calculate()">
+        <div style="font-size: 0.85em; color: #666; margin-top: 5px;">
+            Standard refs: Concrete @ 6MV &approx; 37cm | Concrete @ 15MV &approx; 44cm
+        </div>
     </div>
 
     <div class="results">
@@ -132,43 +169,67 @@
         <div class="result-item">Number of TVLs (n): <span id="resN" class="result-value">0.00</span></div>
         <div class="result-item">Required Thickness: <span id="resThickness" class="result-value">0.0 cm</span></div>
     </div>
+
+    <div class="formula-section">
+        <strong>Calculation Formula</strong>
+        <div class="formula-math">
+            <i>B</i> = [ <i>P</i> &times; (<i>d<sub>inner</sub></i> + <i>t<sub>wall</sub></i>)<sup>2</sup> ] / [ <i>W</i> &times; 1000 &times; <i>U</i> &times; <i>T</i> ]
+        </div>
+        <div class="formula-legend">
+            <strong>Where:</strong><br>
+            <i>B</i> = Required transmission factor<br>
+            <i>P</i> = Permissible dose limit (mR/week)<br>
+            <i>d</i> = Total distance to occupied area (meters)<br>
+            <i>W</i> = Workload (cGy/week)<br>
+            <i>1000</i> = Conversion factor (1 cGy &approx; 1000 mR)<br>
+            <i>U</i> = Use factor<br>
+            <i>T</i> = Occupancy factor<br><br>
+            <i>n</i> = -log<sub>10</sub>(<i>B</i>)<br>
+            <i>Required Thickness</i> = <i>n</i> &times; TVL
+        </div>
+    </div>
 </div>
 
 <script>
     function calculate() {
         // Fetch input values
-        const W_Gy = parseFloat(document.getElementById('workload').value);
-        const d = parseFloat(document.getElementById('distance').value);
+        const W_cGy = parseFloat(document.getElementById('workload').value);
+        const d_inner = parseFloat(document.getElementById('innerDist').value);
+        const t_wall = parseFloat(document.getElementById('wallThick').value);
         const U = parseFloat(document.getElementById('useFactor').value);
         const T = parseFloat(document.getElementById('occupancy').value);
-        const P = parseFloat(document.getElementById('permissibleDose').value);
-        const TVL = parseFloat(document.getElementById('tvlMaterial').value);
+        const P_mR = parseFloat(document.getElementById('permissibleDose').value);
+        const TVL = parseFloat(document.getElementById('tvlInput').value);
 
         // Input validation
-        if (isNaN(W_Gy) || isNaN(d) || W_Gy <= 0 || d <= 0) {
+        if (isNaN(W_cGy) || isNaN(d_inner) || isNaN(t_wall) || isNaN(TVL) || W_cGy <= 0) {
             document.getElementById('resB').innerText = "Invalid Input";
             document.getElementById('resN').innerText = "-";
             document.getElementById('resThickness').innerText = "-";
             return;
         }
 
-        // Calculate B = (P * d^2) / (W * 1000 * U * T)
-        // W is converted from Gy to mSv by multiplying by 1000
-        const W_mSv = W_Gy * 1000;
-        const B = (P * (d * d)) / (W_mSv * U * T);
+        // Calculate total distance
+        const d = d_inner + t_wall;
+        document.getElementById('displayTotalDist').innerText = d.toFixed(2);
+
+        // Calculate B
+        // W is in cGy/week. P is in mR/week. 1 cGy ~ 1000 mR.
+        // Therefore, Workload in mR/week = W_cGy * 1000
+        const W_mR = W_cGy * 1000;
+        const B = (P_mR * (d * d)) / (W_mR * U * T);
 
         let n = 0;
         let thickness = 0;
 
-        // If B >= 1, no shielding is theoretically required for this barrier
-        if (B < 1) {
+        // If B >= 1, no additional shielding is theoretically required 
+        if (B > 0 && B < 1) {
             n = -Math.log10(B);
             thickness = n * TVL;
         }
 
         // Update UI
-        // Format to scientific notation if B is very small
-        document.getElementById('resB').innerText = B < 0.001 ? B.toExponential(4) : B.toFixed(6);
+        document.getElementById('resB').innerText = (B > 0 && B < 0.001) ? B.toExponential(4) : B.toFixed(6);
         document.getElementById('resN').innerText = n.toFixed(2);
         document.getElementById('resThickness').innerText = thickness.toFixed(1) + " cm";
     }
