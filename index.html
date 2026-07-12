@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Radiotherapy Bunker Shielding Calculator</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #34495e;
+            --accent-color: #3498db;
+            --background-color: #f8f9fa;
+            --border-color: #dee2e6;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--background-color);
+            color: var(--primary-color);
+            line-height: 1.6;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .calculator-container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            max-width: 600px;
+            width: 100%;
+        }
+        h2 {
+            margin-top: 0;
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--accent-color);
+            padding-bottom: 10px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: var(--secondary-color);
+        }
+        input[type="number"], select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+        input[type="number"]:focus, select:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+        }
+        .results {
+            margin-top: 25px;
+            padding: 20px;
+            background-color: #e8f4f8;
+            border-left: 4px solid var(--accent-color);
+            border-radius: 4px;
+        }
+        .result-item {
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+        .result-value {
+            font-weight: bold;
+            color: var(--accent-color);
+        }
+    </style>
+</head>
+<body>
+
+<div class="calculator-container">
+    <h2>Primary Barrier Shielding Calculator</h2>
+    <p>Based on NCRP Report 151 methodology.</p>
+
+    <div class="form-group">
+        <label for="workload">Workload (W) [Gy/week]:</label>
+        <input type="number" id="workload" value="500" min="10" step="10" oninput="calculate()">
+    </div>
+
+    <div class="form-group">
+        <label for="distance">Distance to occupied area (d) [meters]:</label>
+        <input type="number" id="distance" value="4.0" min="0.1" step="0.1" oninput="calculate()">
+    </div>
+
+    <div class="form-group">
+        <label for="useFactor">Use Factor (U):</label>
+        <select id="useFactor" onchange="calculate()">
+            <option value="1">1 (Floor / Primary Direct)</option>
+            <option value="0.25" selected>0.25 (Walls / Ceiling)</option>
+            <option value="0.1">0.1 (Some secondary specific)</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="occupancy">Occupancy Factor (T):</label>
+        <select id="occupancy" onchange="calculate()">
+            <option value="1" selected>1 (Work areas, offices, control rooms)</option>
+            <option value="0.2">0.2 (Corridors, employee lounges)</option>
+            <option value="0.05">0.05 (Toilets, outdoor areas)</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="permissibleDose">Permissible Dose (P) [mSv/week]:</label>
+        <select id="permissibleDose" onchange="calculate()">
+            <option value="0.1" selected>0.1 (Controlled Area / Occupational)</option>
+            <option value="0.02">0.02 (Uncontrolled Area / Public)</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="tvlMaterial">Shielding Material & Energy (TVL):</label>
+        <select id="tvlMaterial" onchange="calculate()">
+            <option value="37">Concrete @ 6 MV (TVL = 37 cm)</option>
+            <option value="41">Concrete @ 10 MV (TVL = 41 cm)</option>
+            <option value="44">Concrete @ 15 MV (TVL = 44 cm)</option>
+            <option value="5.7">Lead @ 6 MV (TVL = 5.7 cm)</option>
+            <option value="11">Steel @ 6 MV (TVL = 11.0 cm)</option>
+        </select>
+    </div>
+
+    <div class="results">
+        <div class="result-item">Transmission Factor (B): <span id="resB" class="result-value">0.000</span></div>
+        <div class="result-item">Number of TVLs (n): <span id="resN" class="result-value">0.00</span></div>
+        <div class="result-item">Required Thickness: <span id="resThickness" class="result-value">0.0 cm</span></div>
+    </div>
+</div>
+
+<script>
+    function calculate() {
+        // Fetch input values
+        const W_Gy = parseFloat(document.getElementById('workload').value);
+        const d = parseFloat(document.getElementById('distance').value);
+        const U = parseFloat(document.getElementById('useFactor').value);
+        const T = parseFloat(document.getElementById('occupancy').value);
+        const P = parseFloat(document.getElementById('permissibleDose').value);
+        const TVL = parseFloat(document.getElementById('tvlMaterial').value);
+
+        // Input validation
+        if (isNaN(W_Gy) || isNaN(d) || W_Gy <= 0 || d <= 0) {
+            document.getElementById('resB').innerText = "Invalid Input";
+            document.getElementById('resN').innerText = "-";
+            document.getElementById('resThickness').innerText = "-";
+            return;
+        }
+
+        // Calculate B = (P * d^2) / (W * 1000 * U * T)
+        // W is converted from Gy to mSv by multiplying by 1000
+        const W_mSv = W_Gy * 1000;
+        const B = (P * (d * d)) / (W_mSv * U * T);
+
+        let n = 0;
+        let thickness = 0;
+
+        // If B >= 1, no shielding is theoretically required for this barrier
+        if (B < 1) {
+            n = -Math.log10(B);
+            thickness = n * TVL;
+        }
+
+        // Update UI
+        // Format to scientific notation if B is very small
+        document.getElementById('resB').innerText = B < 0.001 ? B.toExponential(4) : B.toFixed(6);
+        document.getElementById('resN').innerText = n.toFixed(2);
+        document.getElementById('resThickness').innerText = thickness.toFixed(1) + " cm";
+    }
+
+    // Run calculation on initial load
+    window.onload = calculate;
+</script>
+
+</body>
+</html>
