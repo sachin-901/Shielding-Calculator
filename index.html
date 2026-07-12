@@ -11,6 +11,8 @@
             --accent-color: #3498db;
             --background-color: #f8f9fa;
             --border-color: #dee2e6;
+            --safe-color: #27ae60;
+            --danger-color: #c0392b;
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -26,7 +28,7 @@
             padding: 30px;
             border-radius: 8px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            max-width: 600px;
+            max-width: 650px;
             width: 100%;
         }
         h2 {
@@ -73,6 +75,13 @@
             background-color: #e8f4f8;
             border-left: 4px solid var(--accent-color);
             border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .safety-section {
+            padding: 20px;
+            background-color: #f8f9fa;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
         }
         .result-item {
             margin-bottom: 10px;
@@ -81,6 +90,21 @@
         .result-value {
             font-weight: bold;
             color: var(--accent-color);
+        }
+        .status-safe {
+            font-weight: bold;
+            color: var(--safe-color);
+        }
+        .status-unsafe {
+            font-weight: bold;
+            color: var(--danger-color);
+        }
+        .extra-shielding-box {
+            margin-top: 15px; 
+            padding: 15px; 
+            background: #fff5f5; 
+            border: 1px solid #ffcccc; 
+            border-radius: 4px;
         }
         .formula-section {
             margin-top: 30px;
@@ -113,7 +137,7 @@
     
     <div class="form-group">
         <label for="workload">Workload (W) [cGy/week]:</label>
-        <input type="number" id="workload" value="50000.000" min="0" step="0.001" oninput="calculate()">
+        <input type="number" id="workload" value="50000.000" min="0.001" step="0.001" oninput="calculate()">
     </div>
 
     <div class="form-row">
@@ -127,7 +151,7 @@
         </div>
     </div>
     <div style="font-size: 0.85em; color: #666; margin-top: -10px; margin-bottom: 15px;">
-        Total Distance (d) = <span id="displayTotalDist">4.000</span> m
+        Initial Total Distance (d) = <span id="displayTotalDist">4.000</span> m
     </div>
 
     <div class="form-group">
@@ -151,8 +175,8 @@
     <div class="form-group">
         <label for="permissibleDose">Permissible Dose (P) [mR/week]:</label>
         <select id="permissibleDose" onchange="calculate()">
-            <option value="40" selected>40 (Controlled Area / Occupational)</option>
-            <option value="2">2 (Uncontrolled Area / Public)</option>
+            <option value="40.000" selected>40.000 (Controlled Area / Occupational)</option>
+            <option value="2.000">2.000 (Uncontrolled Area / Public)</option>
         </select>
     </div>
 
@@ -162,27 +186,55 @@
     </div>
 
     <div class="results">
-        <div class="result-item">Transmission Factor (B): <span id="resB" class="result-value">0.000</span></div>
-        <div class="result-item">Number of TVLs (n): <span id="resN" class="result-value">0.000</span></div>
-        <div class="result-item">Required Thickness: <span id="resThickness" class="result-value">0.000 cm</span></div>
+        <h3 style="margin-top:0; border-bottom: 1px solid #b3d7ff; padding-bottom: 5px;">Initial Attenuation Profile</h3>
+        <div class="result-item">Initial Transmission Factor (B): <span id="resB" class="result-value">0.000</span></div>
+        <div class="result-item">Initial Number of TVLs (n): <span id="resN" class="result-value">0.000</span></div>
+        <div class="result-item">Initial Required Thickness: <span id="resThickness" class="result-value">0.000 cm</span></div>
+    </div>
+
+    <div class="safety-section">
+        <h3 style="margin-top:0; border-bottom: 1px solid var(--border-color); padding-bottom: 5px;">Safety Assessment</h3>
+        <div class="result-item">Existing Wall Thickness: <span id="resExist" style="font-weight: bold;">0.000 cm</span></div>
+        <div class="result-item" style="margin-bottom: 0;">Status: <span id="resStatus">-</span></div>
+        
+        <div id="extraShieldingConfig" class="extra-shielding-box" style="display:none;">
+            <label style="color: var(--danger-color); margin-bottom: 10px; display: block;">
+                <strong>Action Required: Select Extra Shielding Placement</strong>
+            </label>
+            <div style="margin-bottom: 15px;">
+                <label style="display:inline; margin-right: 20px; cursor: pointer; font-weight: normal;">
+                    <input type="radio" name="placement" value="inner" checked onchange="calculate()"> Inner Side
+                </label>
+                <label style="display:inline; cursor: pointer; font-weight: normal;">
+                    <input type="radio" name="placement" value="outer" onchange="calculate()"> Outer Side
+                </label>
+            </div>
+            <div class="result-item">Final Total Distance (d): <span id="resFinalD" class="result-value">0.000 m</span></div>
+            <div class="result-item">Final Shielding Thickness Required: <span id="resFinalReq" class="result-value">0.000 cm</span></div>
+            <div class="result-item" style="margin-top: 15px; border-top: 1px dashed #ffcccc; padding-top: 10px;">
+                Extra Thickness to Add: <span id="resExtra" class="result-value" style="color: var(--danger-color);">0.000 cm</span>
+            </div>
+        </div>
     </div>
 
     <div class="formula-section">
         <strong>Calculation Formula</strong>
         <div class="formula-math">
-            <i>B</i> = [ <i>P</i> &times; (<i>d<sub>inner</sub></i> + <i>t<sub>wall</sub></i>)<sup>2</sup> ] / [ <i>W</i> &times; 1000 &times; <i>U</i> &times; <i>T</i> ]
+            <i>B</i> = [ <i>P</i> &times; (<i>d<sub>total</sub></i>)<sup>2</sup> ] / [ <i>W</i> &times; 1000 &times; <i>U</i> &times; <i>T</i> ]
         </div>
         <div class="formula-legend">
             <strong>Where:</strong><br>
             <i>B</i> = Required transmission factor<br>
             <i>P</i> = Permissible dose limit (mR/week)<br>
-            <i>d</i> = Total distance to occupied area (meters)<br>
             <i>W</i> = Workload (cGy/week)<br>
             <i>1000</i> = Conversion factor (1 cGy &approx; 1000 mR)<br>
             <i>U</i> = Use factor<br>
-            <i>T</i> = Occupancy factor<br><br>
+            <i>T</i> = Occupancy factor<br>
+            <i>d<sub>total</sub></i> = Total distance to occupied area (meters)<br><br>
             <i>n</i> = -log<sub>10</sub>(<i>B</i>)<br>
-            <i>Required Thickness</i> = <i>n</i> &times; TVL
+            <i>Required Thickness</i> = <i>n</i> &times; TVL<br><br>
+            <strong>Note on Outer Shielding:</strong><br>
+            If extra shielding is added to the <i>outer</i> side, <i>d<sub>total</sub></i> becomes <i>d<sub>inner</sub> + t<sub>wall</sub> + t<sub>extra</sub></i>. Because distance increases, the required attenuation slightly decreases. The calculator solves this iteratively to find the exact required extra thickness.
         </div>
     </div>
 </div>
@@ -197,42 +249,85 @@
         const T = parseFloat(document.getElementById('occupancy').value);
         const P_mR = parseFloat(document.getElementById('permissibleDose').value);
         const TVL = parseFloat(document.getElementById('tvlInput').value);
+        const placement = document.querySelector('input[name="placement"]:checked').value;
 
         // Input validation
         if (isNaN(W_cGy) || isNaN(d_inner) || isNaN(t_wall) || isNaN(TVL) || W_cGy <= 0) {
-            document.getElementById('resB').innerText = "Invalid";
-            document.getElementById('resN').innerText = "-";
-            document.getElementById('resThickness').innerText = "-";
-            return;
+            return; // Exit silently if inputs are cleared or invalid
         }
 
-        // Calculate total distance and format to 3 decimal places
-        const d = d_inner + t_wall;
-        document.getElementById('displayTotalDist').innerText = d.toFixed(3);
+        // 1. Initial Calculations
+        const d_base = d_inner + t_wall;
+        document.getElementById('displayTotalDist').innerText = d_base.toFixed(3);
 
-        // Calculate B
         const W_mR = W_cGy * 1000;
-        const B = (P_mR * (d * d)) / (W_mR * U * T);
+        const B_initial = (P_mR * (d_base * d_base)) / (W_mR * U * T);
 
-        let n = 0;
-        let thickness = 0;
+        let n_initial = 0;
+        let T_req_initial = 0;
 
-        // Calculate n and thickness if B requires attenuation (B < 1)
-        if (B > 0 && B < 1) {
-            n = -Math.log10(B);
-            thickness = n * TVL;
+        if (B_initial > 0 && B_initial < 1) {
+            n_initial = -Math.log10(B_initial);
+            T_req_initial = n_initial * TVL;
         }
 
-        // Format outputs to exactly 3 decimal places.
-        // For B, if it's extremely small, scientific notation with 3 decimal places is used.
-        if (B > 0 && B < 0.001) {
-            document.getElementById('resB').innerText = B.toExponential(3);
+        // Display Initial Results
+        if (B_initial > 0 && B_initial < 0.001) {
+            document.getElementById('resB').innerText = B_initial.toExponential(3);
         } else {
-            document.getElementById('resB').innerText = B.toFixed(3);
+            document.getElementById('resB').innerText = B_initial.toFixed(3);
         }
-        
-        document.getElementById('resN').innerText = n.toFixed(3);
-        document.getElementById('resThickness').innerText = thickness.toFixed(3) + " cm";
+        document.getElementById('resN').innerText = n_initial.toFixed(3);
+        document.getElementById('resThickness').innerText = T_req_initial.toFixed(3) + " cm";
+
+        // 2. Safety Assessment
+        const t_exist_cm = t_wall * 100; // Convert existing wall meters to cm
+        document.getElementById('resExist').innerText = t_exist_cm.toFixed(3) + " cm";
+
+        const statusEl = document.getElementById('resStatus');
+        const extraSection = document.getElementById('extraShieldingConfig');
+
+        if (T_req_initial <= t_exist_cm) {
+            // SAFE Condition
+            statusEl.innerText = "SAFE (Existing wall is sufficient)";
+            statusEl.className = "status-safe";
+            extraSection.style.display = "none";
+        } else {
+            // UNSAFE Condition
+            statusEl.innerText = "UNSAFE (Additional shielding required)";
+            statusEl.className = "status-unsafe";
+            extraSection.style.display = "block";
+
+            let final_d = d_base;
+            let final_T_req = T_req_initial;
+            let extra_cm = 0;
+
+            if (placement === 'inner') {
+                // If added on the inside, the distance to the occupied area doesn't change.
+                extra_cm = T_req_initial - t_exist_cm;
+                final_d = d_base;
+                final_T_req = T_req_initial;
+            } else if (placement === 'outer') {
+                // Iterative calculation: adding thickness outside increases distance, 
+                // which slightly lowers the required shielding thickness.
+                let current_extra = T_req_initial - t_exist_cm;
+                
+                // 10 iterations is more than enough for convergence to 3 decimal places
+                for (let i = 0; i < 10; i++) {
+                    final_d = d_base + (current_extra / 100);
+                    let final_B = (P_mR * (final_d * final_d)) / (W_mR * U * T);
+                    let final_n = final_B > 0 && final_B < 1 ? -Math.log10(final_B) : 0;
+                    final_T_req = final_n * TVL;
+                    current_extra = final_T_req - t_exist_cm;
+                }
+                extra_cm = current_extra;
+            }
+
+            // Display Final Requirements
+            document.getElementById('resFinalD').innerText = final_d.toFixed(3) + " m";
+            document.getElementById('resFinalReq').innerText = final_T_req.toFixed(3) + " cm";
+            document.getElementById('resExtra').innerText = extra_cm.toFixed(3) + " cm";
+        }
     }
 
     // Run calculation on initial load
